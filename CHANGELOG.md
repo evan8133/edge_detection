@@ -1,3 +1,9 @@
+## 1.1.4
+
+- Fixed Android build error by adding namespace to build.gradle file
+- Updated for compatibility with latest Android Gradle Plugin versions
+- Resolved "Namespace not specified" error that prevented Android builds
+
 ## 1.1.3
 
 - Added fix for getting images from gallery (Thanks to @etrigan21 for the PR)
