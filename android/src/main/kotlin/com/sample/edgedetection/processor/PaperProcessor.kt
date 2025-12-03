@@ -1,6 +1,9 @@
 package com.sample.edgedetection.processor
 
 import android.graphics.Bitmap
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.util.Log
 import org.opencv.android.Utils
 import org.opencv.core.*
@@ -59,16 +62,32 @@ fun enhancePicture(src: Bitmap?): Bitmap {
     val srcMat = Mat()
     Utils.bitmapToMat(src, srcMat)
     Imgproc.cvtColor(srcMat, srcMat, Imgproc.COLOR_RGBA2GRAY)
+    
+    // Apply adaptive threshold with optimized parameters for better text readability
     Imgproc.adaptiveThreshold(
         srcMat,
         srcMat,
         255.0,
-        Imgproc.ADAPTIVE_THRESH_MEAN_C,
+        Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
         Imgproc.THRESH_BINARY,
-        15,
-        15.0
+        11,
+        10.0
     )
+    
     val result = Bitmap.createBitmap(src?.width ?: 1080, src?.height ?: 1920, Bitmap.Config.RGB_565)
+    Utils.matToBitmap(srcMat, result, true)
+    srcMat.release()
+    return result
+}
+
+fun adjustBrightness(src: Bitmap?, alpha: Double = 1.2, beta: Int = 10): Bitmap {
+    val srcMat = Mat()
+    Utils.bitmapToMat(src, srcMat)
+    
+    // Adjust contrast and brightness: output = alpha * input + beta
+    srcMat.convertTo(srcMat, -1, alpha, beta.toDouble())
+    
+    val result = Bitmap.createBitmap(src?.width ?: 1080, src?.height ?: 1920, Bitmap.Config.ARGB_8888)
     Utils.matToBitmap(srcMat, result, true)
     srcMat.release()
     return result
@@ -88,7 +107,7 @@ private fun findContours(src: Mat): List<MatOfPoint> {
     Imgproc.cvtColor(src, grayImage, Imgproc.COLOR_BGR2GRAY)
     Imgproc.GaussianBlur(grayImage, grayImage, Size(5.0, 5.0), 0.0)
     Imgproc.threshold(grayImage, grayImage, 20.0, 255.0, Imgproc.THRESH_TRIANGLE)
-    Imgproc.Canny(grayImage, cannedImage, 75.0, 200.0)
+    Imgproc.Canny(grayImage, cannedImage, 50.0, 150.0)
     Imgproc.dilate(cannedImage, dilate, kernel)
     val contours = ArrayList<MatOfPoint>()
     val hierarchy = Mat()
@@ -101,7 +120,7 @@ private fun findContours(src: Mat): List<MatOfPoint> {
     )
 
     val filteredContours = contours
-        .filter { p: MatOfPoint -> Imgproc.contourArea(p) > 100e2 }
+        .filter { p: MatOfPoint -> Imgproc.contourArea(p) > 50e2 }
         .sortedByDescending { p: MatOfPoint -> Imgproc.contourArea(p) }
         .take(25)
 
@@ -124,7 +143,7 @@ private fun getCorners(contours: List<MatOfPoint>, size: Size): Corners? {
             val c2f = MatOfPoint2f(*contours[index].toArray())
             val peri = Imgproc.arcLength(c2f, true)
             val approx = MatOfPoint2f()
-            Imgproc.approxPolyDP(c2f, approx, 0.03 * peri, true)
+            Imgproc.approxPolyDP(c2f, approx, 0.02 * peri, true)
             val points = approx.toArray().asList()
             val convex = MatOfPoint()
             approx.convertTo(convex, CvType.CV_32S)

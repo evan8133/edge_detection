@@ -11,6 +11,7 @@ import com.sample.edgedetection.processor.Corners
 import com.sample.edgedetection.processor.TAG
 import com.sample.edgedetection.processor.cropPicture
 import com.sample.edgedetection.processor.enhancePicture
+import com.sample.edgedetection.processor.adjustBrightness
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
@@ -31,6 +32,7 @@ class CropPresenter(
     private var croppedBitmap: Bitmap? = null
     private var rotateBitmap: Bitmap? = null
     private var rotateBitmapDegree: Int = -90
+    private var enhanceMode: Int = 0 // 0=none, 1=brightness, 2=black&white
 
     fun onViewsReady(paperWidth: Int, paperHeight: Int) {
         iCropView.getPaperRect().onCorners2Crop(corners, picture?.size(), paperWidth, paperHeight)
@@ -76,28 +78,33 @@ class CropPresenter(
             return
         }
 
-        val imgToEnhance: Bitmap? = when {
-            enhancedPicture != null -> {
-                enhancedPicture
-            }
-            rotateBitmap != null -> {
-                rotateBitmap
-            }
-            else -> {
-                croppedBitmap
-            }
-        }
+        // Cycle through enhancement modes: none -> brightness -> B&W -> none
+        enhanceMode = (enhanceMode + 1) % 3
+        
+        val baseImage: Bitmap? = croppedBitmap
 
-        Observable.create<Bitmap> {
-            it.onNext(enhancePicture(imgToEnhance))
+        Observable.create<Bitmap> { emitter ->
+            val result = when (enhanceMode) {
+                1 -> {
+                    Log.i(TAG, "Applying brightness enhancement")
+                    adjustBrightness(baseImage, 1.3, 15)
+                }
+                2 -> {
+                    Log.i(TAG, "Applying black & white enhancement")
+                    enhancePicture(baseImage)
+                }
+                else -> {
+                    Log.i(TAG, "Resetting to original")
+                    baseImage!!
+                }
+            }
+            emitter.onNext(result)
         }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe { pc ->
-
                 enhancedPicture = pc
-                rotateBitmap = enhancedPicture
-
+                rotateBitmap = pc
                 iCropView.getCroppedPaper().setImageBitmap(pc)
             }
     }
@@ -109,6 +116,7 @@ class CropPresenter(
         }
         rotateBitmap = croppedBitmap
         enhancedPicture = croppedBitmap
+        enhanceMode = 0 // Reset enhancement mode
 
         iCropView.getCroppedPaper().setImageBitmap(croppedBitmap)
     }

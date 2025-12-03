@@ -28,9 +28,7 @@ abstract class BaseActivity : AppCompatActivity() {
         // Use a dark scrim by default since light nav bar is API 27+
         val winParams = window.attributes
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            systemUiVisibility = systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        }
+        // Removed SYSTEM_UI_FLAG_LIGHT_STATUS_BAR to use dark icons on light background
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             systemUiVisibility = systemUiVisibility or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE or

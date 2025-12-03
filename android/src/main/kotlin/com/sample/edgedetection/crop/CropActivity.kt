@@ -31,6 +31,11 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
             // we have to initialize everything in post when the view has been drawn and we have the actual height and width of the whole view
             mPresenter.onViewsReady(findViewById<View>(R.id.paper).width, findViewById<View>(R.id.paper).height)
         }
+        
+        findViewById<ImageView>(R.id.enhance_btn).setOnClickListener {
+            Log.e(TAG, "Enhance button touched!")
+            mPresenter.enhance()
+        }
     }
 
     override fun provideContentViewId(): Int = R.layout.activity_crop
@@ -43,6 +48,7 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
             Log.e(TAG, "Crop touched!")
             mPresenter.crop()
             changeMenuVisibility(true)
+            findViewById<ImageView>(R.id.enhance_btn).visibility = View.VISIBLE
         }
     }
 

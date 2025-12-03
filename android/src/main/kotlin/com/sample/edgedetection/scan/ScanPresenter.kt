@@ -171,7 +171,7 @@ class ScanPresenter constructor(
             )
         }
 
-        Log.i(TAG, "Selected preview size: ${size?.width}${size?.height}")
+        Log.i(TAG, "Selected preview size: ${size?.width}x${size?.height}")
 
         size?.width?.toString()?.let { Log.i(TAG, it) }
         val param = mCamera?.parameters
@@ -183,18 +183,28 @@ class ScanPresenter constructor(
 
         val displayWidth = minOf(point.x, point.y)
         val displayHeight = maxOf(point.x, point.y)
-        val displayRatio = displayWidth.div(displayHeight.toFloat())
+        val displayRatio = displayWidth.toFloat().div(displayHeight.toFloat())
         val previewRatio = size?.height?.toFloat()?.div(size.width.toFloat()) ?: displayRatio
-        if (displayRatio > previewRatio) {
-            val surfaceParams = iView.getSurfaceView().layoutParams
-            surfaceParams.height = (displayHeight / displayRatio * previewRatio).toInt()
+        
+        // Improved aspect ratio handling
+        val surfaceParams = iView.getSurfaceView().layoutParams
+        if (Math.abs(displayRatio - previewRatio) > 0.01) {
+            // Adjust surface view to match preview aspect ratio
+            val adjustedHeight = (displayWidth.toFloat() / previewRatio).toInt()
+            if (adjustedHeight <= displayHeight) {
+                surfaceParams.height = adjustedHeight
+            } else {
+                surfaceParams.width = (displayHeight.toFloat() * previewRatio).toInt()
+            }
             iView.getSurfaceView().layoutParams = surfaceParams
         }
 
         val supportPicSize = mCamera?.parameters?.supportedPictureSizes
         supportPicSize?.sortByDescending { it.width.times(it.height) }
+        
+        // Find picture size with matching aspect ratio
         var pictureSize = supportPicSize?.find {
-            it.height.toFloat().div(it.width.toFloat()) - previewRatio < 0.01
+            Math.abs(it.height.toFloat().div(it.width.toFloat()) - previewRatio) < 0.05
         }
 
         if (null == pictureSize) {
@@ -205,6 +215,7 @@ class ScanPresenter constructor(
             Log.e(TAG, "can not get picture size")
         } else {
             param?.setPictureSize(pictureSize.width, pictureSize.height)
+            Log.i(TAG, "Picture size set to: ${pictureSize.width}x${pictureSize.height}")
         }
         val pm = context.packageManager
         if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_AUTOFOCUS) && mCamera!!.parameters.supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))

@@ -71,8 +71,20 @@
         android:layout_height="wrap_content"
         android:padding="15dp"
         android:layout_alignParentBottom="true"
-        android:background="@color/colorPrimary"
+        android:background="@color/colorBottomBar"
         >
+
+        <ImageView
+            android:id="@+id/enhance_btn"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/round_button"
+            android:padding="12dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_enhance"
+            app:tint="@android:color/white" />
 
         <ImageView
             android:id="@+id/crop"
