@@ -23,6 +23,13 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
     override fun prepare() {
         this.initialBundle = intent.getBundleExtra(EdgeDetectionHandler.INITIAL_BUNDLE) as Bundle
         this.title = initialBundle.getString(EdgeDetectionHandler.CROP_TITLE)
+        
+        // Set action bar styling for proper visibility
+        supportActionBar?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(resources.getColor(R.color.colorPrimary)))
+            setDisplayHomeAsUpEnabled(true)
+            setHomeAsUpIndicator(android.R.drawable.ic_menu_close_clear_cancel)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,11 +37,6 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
         findViewById<View>(R.id.paper).post {
             // we have to initialize everything in post when the view has been drawn and we have the actual height and width of the whole view
             mPresenter.onViewsReady(findViewById<View>(R.id.paper).width, findViewById<View>(R.id.paper).height)
-        }
-        
-        findViewById<ImageView>(R.id.enhance_btn).setOnClickListener {
-            Log.e(TAG, "Enhance button touched!")
-            mPresenter.enhance()
         }
     }
 
@@ -44,12 +46,6 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
     override fun initPresenter() {
         val initialBundle = intent.getBundleExtra(EdgeDetectionHandler.INITIAL_BUNDLE) as Bundle
         mPresenter = CropPresenter(this, initialBundle)
-        findViewById<ImageView>(R.id.crop).setOnClickListener {
-            Log.e(TAG, "Crop touched!")
-            mPresenter.crop()
-            changeMenuVisibility(true)
-            findViewById<ImageView>(R.id.enhance_btn).visibility = View.VISIBLE
-        }
     }
 
     override fun getPaper(): ImageView = findViewById(R.id.paper)
@@ -61,22 +57,16 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.crop_activity_menu, menu)
 
-        menu.setGroupVisible(R.id.enhance_group, showMenuItems)
-
+        menu.findItem(R.id.crop_action).isVisible = !showMenuItems
+        menu.findItem(R.id.action_label).isVisible = showMenuItems
         menu.findItem(R.id.rotation_image).isVisible = showMenuItems
+        menu.findItem(R.id.gray).isVisible = showMenuItems
+        menu.findItem(R.id.reset).isVisible = showMenuItems
 
         menu.findItem(R.id.gray).title =
             initialBundle.getString(EdgeDetectionHandler.CROP_BLACK_WHITE_TITLE) as String
         menu.findItem(R.id.reset).title =
             initialBundle.getString(EdgeDetectionHandler.CROP_RESET_TITLE) as String
-
-        if (showMenuItems) {
-            menu.findItem(R.id.action_label).isVisible = true
-            findViewById<ImageView>(R.id.crop).visibility = View.GONE
-        } else {
-            menu.findItem(R.id.action_label).isVisible = false
-            findViewById<ImageView>(R.id.crop).visibility = View.VISIBLE
-        }
 
         return super.onCreateOptionsMenu(menu)
     }
@@ -92,6 +82,12 @@ class CropActivity : BaseActivity(), ICropView.Proxy {
         when (item.itemId) {
             android.R.id.home -> {
                 onBackPressed()
+                return true
+            }
+            R.id.crop_action -> {
+                Log.e(TAG, "Crop action touched!")
+                mPresenter.crop()
+                changeMenuVisibility(true)
                 return true
             }
             R.id.action_label -> {

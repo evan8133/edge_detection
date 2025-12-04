@@ -54,6 +54,9 @@ class PaperRectangle : View {
     }
 
     fun onCornersDetected(corners: Corners) {
+        if (measuredWidth == 0 || measuredHeight == 0) {
+            return
+        }
 
         ratioX = corners.size.width.div(measuredWidth)
         ratioY = corners.size.height.div(measuredHeight)

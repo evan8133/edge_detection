@@ -186,30 +186,24 @@ class ScanPresenter constructor(
         val displayRatio = displayWidth.toFloat().div(displayHeight.toFloat())
         val previewRatio = size?.height?.toFloat()?.div(size.width.toFloat()) ?: displayRatio
         
-        // Improved aspect ratio handling
-        val surfaceParams = iView.getSurfaceView().layoutParams
-        if (Math.abs(displayRatio - previewRatio) > 0.01) {
-            // Adjust surface view to match preview aspect ratio
-            val adjustedHeight = (displayWidth.toFloat() / previewRatio).toInt()
-            if (adjustedHeight <= displayHeight) {
-                surfaceParams.height = adjustedHeight
-            } else {
-                surfaceParams.width = (displayHeight.toFloat() * previewRatio).toInt()
-            }
-            iView.getSurfaceView().layoutParams = surfaceParams
-        }
+        Log.i(TAG, "Display: ${displayWidth}x${displayHeight}, ratio: $displayRatio")
+        Log.i(TAG, "Preview ratio: $previewRatio")
+        
+        // Don't adjust the surface view size - keep it full screen
+        // The camera will handle the aspect ratio internally
+        // This prevents the offset issue with the detection overlay
 
         val supportPicSize = mCamera?.parameters?.supportedPictureSizes
+        
+        // Log all supported picture sizes for debugging
+        supportPicSize?.forEach {
+            Log.d(TAG, "Supported picture size: ${it.width}x${it.height}")
+        }
+        
         supportPicSize?.sortByDescending { it.width.times(it.height) }
         
-        // Find picture size with matching aspect ratio
-        var pictureSize = supportPicSize?.find {
-            Math.abs(it.height.toFloat().div(it.width.toFloat()) - previewRatio) < 0.05
-        }
-
-        if (null == pictureSize) {
-            pictureSize = supportPicSize?.get(0)
-        }
+        // Find the highest resolution picture size for best quality
+        var pictureSize = supportPicSize?.firstOrNull()
 
         if (null == pictureSize) {
             Log.e(TAG, "can not get picture size")
@@ -218,13 +212,26 @@ class ScanPresenter constructor(
             Log.i(TAG, "Picture size set to: ${pictureSize.width}x${pictureSize.height}")
         }
         val pm = context.packageManager
-        if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_AUTOFOCUS) && mCamera!!.parameters.supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))
-        {
-            param?.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
-            Log.i(TAG, "enabling autofocus")
+        if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_AUTOFOCUS)) {
+            // Try to use macro mode for better document scanning
+            if (mCamera!!.parameters.supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
+                param?.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
+                Log.i(TAG, "enabling continuous autofocus")
+            } else if (mCamera!!.parameters.supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
+                param?.focusMode = Camera.Parameters.FOCUS_MODE_AUTO
+                Log.i(TAG, "enabling auto focus")
+            }
         } else {
             Log.i(TAG, "autofocus not available")
         }
+        
+        // Set white balance and scene mode for better document scanning
+        if (mCamera!!.parameters.supportedWhiteBalance?.contains(Camera.Parameters.WHITE_BALANCE_AUTO) == true) {
+            param?.whiteBalance = Camera.Parameters.WHITE_BALANCE_AUTO
+        }
+        
+        // Optimize JPEG quality for better results
+        param?.jpegQuality = 100
 
         param?.flashMode = Camera.Parameters.FLASH_MODE_OFF
 
@@ -235,30 +242,52 @@ class ScanPresenter constructor(
 
     private fun matrixResizer(sourceMatrix: Mat): Mat {
         val sourceSize: Size = sourceMatrix.size()
-        var copied = Mat()
+        Log.i(TAG, "matrixResizer input size: ${sourceSize.height} x ${sourceSize.width}")
+        
+        val copied: Mat
         if (sourceSize.height < sourceSize.width) {
+            copied = Mat()
             Core.rotate(sourceMatrix, copied, ROTATE_90_CLOCKWISE)
+            Log.i(TAG, "Rotated image, new size: ${copied.size().height} x ${copied.size().width}")
         } else {
-            copied = sourceMatrix
+            copied = sourceMatrix.clone()
         }
+        
         val copiedSize: Size = copied.size()
         return if (copiedSize.width > ScanConstants.MAX_SIZE.width || copiedSize.height > ScanConstants.MAX_SIZE.height) {
-            var useRatio = 0.0
             val widthRatio: Double = ScanConstants.MAX_SIZE.width / copiedSize.width
             val heightRatio: Double = ScanConstants.MAX_SIZE.height / copiedSize.height
-            useRatio = if(widthRatio > heightRatio)  widthRatio else heightRatio
+            val useRatio = if(widthRatio < heightRatio) widthRatio else heightRatio
             val resizedImage = Mat()
             val newSize = Size(copiedSize.width * useRatio, copiedSize.height * useRatio)
-            Imgproc.resize(copied, resizedImage, newSize)
+            Log.i(TAG, "Resizing to: ${newSize.height} x ${newSize.width}")
+            // Use INTER_AREA for downscaling (better quality than default)
+            Imgproc.resize(copied, resizedImage, newSize, 0.0, 0.0, Imgproc.INTER_AREA)
+            if (copied != sourceMatrix) {
+                copied.release()
+            }
             resizedImage
         } else {
             copied
         }
     }
     fun detectEdge(pic: Mat) {
-        Log.i("height", pic.size().height.toString())
-        Log.i("width", pic.size().width.toString())
+        Log.i(TAG, "Original image size: ${pic.size().height} x ${pic.size().width}")
+        
+        if (pic.empty() || pic.size().height <= 0 || pic.size().width <= 0) {
+            Log.e(TAG, "Invalid image matrix")
+            return
+        }
+        
         val resizedMat = matrixResizer(pic)
+        
+        Log.i(TAG, "Resized image size: ${resizedMat.size().height} x ${resizedMat.size().width}")
+        
+        if (resizedMat.empty() || resizedMat.size().height <= 0 || resizedMat.size().width <= 0) {
+            Log.e(TAG, "Failed to resize image")
+            return
+        }
+        
         SourceManager.corners = processPicture(resizedMat)
         Imgproc.cvtColor(resizedMat, resizedMat, Imgproc.COLOR_RGB2BGRA)
         SourceManager.pic = resizedMat
@@ -288,23 +317,39 @@ class ScanPresenter constructor(
         Log.i(TAG, "on picture taken")
         Observable.just(p0)
             .subscribeOn(proxySchedule)
-            .subscribe {
-                val pictureSize = p1?.parameters?.pictureSize
-                Log.i(TAG, "picture size: " + pictureSize.toString())
-                val mat = Mat(
-                    Size(
-                        pictureSize?.width?.toDouble() ?: 1920.toDouble(),
-                        pictureSize?.height?.toDouble() ?: 1080.toDouble()
-                    ), CvType.CV_8U
-                )
-                mat.put(0, 0, p0)
-                val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
-                Core.rotate(pic, pic, Core.ROTATE_90_CLOCKWISE)
-                mat.release()
-                detectEdge(pic)
+            .subscribe ({ data ->
+                try {
+                    val pictureSize = p1?.parameters?.pictureSize
+                    Log.i(TAG, "picture size: " + pictureSize.toString())
+                    val mat = Mat(
+                        Size(
+                            pictureSize?.width?.toDouble() ?: 1920.toDouble(),
+                            pictureSize?.height?.toDouble() ?: 1080.toDouble()
+                        ), CvType.CV_8U
+                    )
+                    mat.put(0, 0, data)
+                    val pic = Imgcodecs.imdecode(mat, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED)
+                    mat.release()
+                    
+                    if (!pic.empty()) {
+                        Core.rotate(pic, pic, Core.ROTATE_90_CLOCKWISE)
+                        detectEdge(pic)
+                    } else {
+                        Log.e(TAG, "Failed to decode image")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error processing picture: ${e.message}")
+                    e.printStackTrace()
+                } finally {
+                    shutted = true
+                    busy = false
+                }
+            }, { error ->
+                Log.e(TAG, "Error in onPictureTaken: ${error.message}")
+                error.printStackTrace()
                 shutted = true
                 busy = false
-            }
+            })
     }
 
     override fun onPreviewFrame(p0: ByteArray?, p1: Camera?) {

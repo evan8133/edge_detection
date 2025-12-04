@@ -45,6 +45,12 @@ class ScanActivity : BaseActivity(), IScanView.Proxy {
         else {
             Log.i("OpenCV", "OpenCV loaded Successfully!");
         }
+        
+        // Set action bar styling for proper visibility
+        supportActionBar?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(resources.getColor(R.color.colorPrimary)))
+            setDisplayHomeAsUpEnabled(true)
+        }
 
         findViewById<View>(R.id.shut).setOnClickListener {
             if (mPresenter.canShut) {

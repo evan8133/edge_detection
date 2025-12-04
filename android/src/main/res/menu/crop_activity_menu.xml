@@ -1,6 +1,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/crop_action"
+        android:icon="@drawable/ic_crop"
+        android:title="@string/crop"
+        app:showAsAction="always" />
+        
+    <item
         android:id="@+id/action_label"
         android:icon="@drawable/ic_done"
         android:title="@string/done"
@@ -12,18 +18,15 @@
         android:title="@string/rotate"
         app:showAsAction="always" />
 
-    <group
-        android:id="@+id/enhance_group"
-        android:checkableBehavior="single">
-        <item
-            android:id="@+id/gray"
-            android:icon="@drawable/ic_invert_colors"
-            android:title="@string/black"
-            app:showAsAction="ifRoom" />
-        <item
-            android:id="@+id/reset"
-            android:icon="@drawable/ic_reset_colors"
-            android:title="@string/reset"
-            app:showAsAction="ifRoom" />
-    </group>
+    <item
+        android:id="@+id/gray"
+        android:icon="@drawable/ic_invert_colors"
+        android:title="@string/black"
+        app:showAsAction="always" />
+        
+    <item
+        android:id="@+id/reset"
+        android:icon="@drawable/ic_reset_colors"
+        android:title="@string/reset"
+        app:showAsAction="always" />
 </menu>

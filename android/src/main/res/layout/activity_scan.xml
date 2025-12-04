@@ -8,12 +8,15 @@
     <SurfaceView
         android:id="@+id/surface"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true" />
 
     <com.sample.edgedetection.view.PaperRectangle
         android:id="@+id/paper_rect"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_alignTop="@id/surface"
+        android:layout_alignBottom="@id/surface"
         android:background="@color/colorTransparent" />
 
     <RelativeLayout

@@ -45,8 +45,17 @@ fun cropPicture(picture: Mat, pts: List<Point>): Mat {
     val srcMat = Mat(4, 1, CvType.CV_32FC2)
     val dstMat = Mat(4, 1, CvType.CV_32FC2)
 
+    // Add padding to prevent cutting off content at document edges
+    // This ensures corners map slightly inward, preserving boundary content
+    val padding = 8.0
+
     srcMat.put(0, 0, tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y)
-    dstMat.put(0, 0, 0.0, 0.0, dw, 0.0, dw, dh, 0.0, dh)
+    dstMat.put(0, 0, 
+        padding, padding,           // Top-left
+        dw - padding, padding,      // Top-right
+        dw - padding, dh - padding, // Bottom-right
+        padding, dh - padding       // Bottom-left
+    )
 
     val m = Imgproc.getPerspectiveTransform(srcMat, dstMat)
 
@@ -90,6 +99,30 @@ fun adjustBrightness(src: Bitmap?, alpha: Double = 1.2, beta: Int = 10): Bitmap 
     val result = Bitmap.createBitmap(src?.width ?: 1080, src?.height ?: 1920, Bitmap.Config.ARGB_8888)
     Utils.matToBitmap(srcMat, result, true)
     srcMat.release()
+    return result
+}
+
+fun sharpenImage(src: Bitmap?): Bitmap {
+    val srcMat = Mat()
+    Utils.bitmapToMat(src, srcMat)
+    
+    // Apply sharpening kernel for better clarity
+    val kernel = Mat(3, 3, CvType.CV_32F)
+    kernel.put(0, 0, 
+        0.0, -1.0, 0.0,
+        -1.0, 5.0, -1.0,
+        0.0, -1.0, 0.0
+    )
+    
+    val sharpened = Mat()
+    Imgproc.filter2D(srcMat, sharpened, -1, kernel)
+    
+    val result = Bitmap.createBitmap(src?.width ?: 1080, src?.height ?: 1920, Bitmap.Config.ARGB_8888)
+    Utils.matToBitmap(sharpened, result, true)
+    
+    srcMat.release()
+    sharpened.release()
+    kernel.release()
     return result
 }
 
